@@ -94,9 +94,10 @@ export function createSafeEvaluatorFactory(
         sloppyGlobalsMode
       );
       const scopeProxyRevocable = proxyRevocable(immutableObject, scopeHandler);
-
-      const scopedEvaluator = apply(scopedEvaluatorFactory, safeGlobal, [
-        scopeProxyRevocable.proxy
+      const scopeProxy = scopeProxyRevocable.proxy;
+      
+      const scopedEvaluator = apply(scopedEvaluatorFactory, scopeProxy, [
+        scopeProxy
       ]);
 
       scopeHandler.useUnsafeEvaluator = true;
