@@ -89,22 +89,27 @@ const keywords = new Set([
 const identifierPattern = new RegExp('^[a-zA-Z_$][\\w$]*$');
 
 /**
- * getOptimizableGlobals()
- * What variable names might it bring into scope? These include all
- * property names which can be variable names, including the names
- * of inherited properties. It excludes symbols and names which are
- * keywords. We drop symbols safely. Currently, this shim refuses
- * service if any of the names are keywords or keyword-like. This is
- * safe and only prevent performance optimization.
+ * getOptimizableConstants()
+ *
+ * Assume that the properties of `globalishObject` (need a better
+ * name) are aliased to variable names, except those shadowed by `exclusions`.
+ * Which property names of `globalish might we predeclare as `const`
+ * variables?
+ *    * The property's value would need to be stable, so the property
+ *      must be non-writable non-enumerable own property.
+ *    * The name must not be shadowed by exclusions.
+ *    * The name must be a string rather than a symbol
+ *    * The name must be a non-keyword identifier
+ *    * The name must not be "eval", since we treat that specially.
  */
-export function getOptimizableGlobals(globalObject, localObject = {}) {
-  const globalNames = getOwnPropertyNames(globalObject);
+export function getOptimizableConstants(globalishObject, exclusions = {}) {
+  const globalNames = getOwnPropertyNames(globalishObject);
   // getOwnPropertyNames does ignore Symbols so we don't need this extra check:
   // typeof name === 'string' &&
   const constants = arrayFilter(globalNames, name => {
-    // Exclude globals that will be hidden behind an object positioned
+    // Exclude properties that will be hidden behind an object positioned
     // closer in the resolution scope chain, typically the endowments.
-    if (name in localObject) {
+    if (name in exclusions) {
       return false;
     }
 
@@ -118,23 +123,26 @@ export function getOptimizableGlobals(globalObject, localObject = {}) {
       return false;
     }
 
-    const desc = getOwnPropertyDescriptor(globalObject, name);
+    const desc = getOwnPropertyDescriptor(globalishObject, name);
     return (
       //
-      // The getters will not have .writable, don't let the falsyness of
-      // 'undefined' trick us: test with === false, not ! . However descriptors
-      // inherit from the (potentially poisoned) global object, so we might see
-      // extra properties which weren't really there. Accessor properties have
+      // The getters will not have .writable, don't let the falsyness
+      // of 'undefined' trick us: test with === false, not ! . However
+      // descriptors inherit from the (potentially poisoned)
+      // Object.prototype, so we might see extra properties which
+      // weren't really there. Accessor properties have
       // 'get/set/enumerable/configurable', while data properties have
-      // 'value/writable/enumerable/configurable'.
+      // 'value/writable/enumerable/configurable'. Hence the own
+      // property check for `value` below.
       desc.configurable === false &&
       desc.writable === false &&
       //
-      // Checks for data properties because they're the only ones we can
-      // optimize (accessors are most likely non-constant). Descriptors can't
-      // can't have accessors and value properties at the same time, therefore
-      // this check is sufficient. Using explicit own property deal with the
-      // case where Object.prototype has been poisoned.
+      // Checks for data properties because they're the only ones we
+      // can optimize (accessors are most likely
+      // non-constant). Descriptors can't can't have accessors and
+      // value properties at the same time, therefore this check is
+      // sufficient. Using an explicit own property check deals with
+      // the case where Object.prototype has been poisoned.
       objectHasOwnProperty(desc, 'value')
     );
   });
@@ -145,7 +153,7 @@ export function getOptimizableGlobals(globalObject, localObject = {}) {
 export function buildOptimizer(constants) {
   // No need to build an oprimizer when there are no constants.
   if (constants.length === 0) return '';
-  // Use 'this' to avoid going through the scope proxy, which is unecessary
-  // since the optimizer only needs references to the safe global.
+  // Extract the optimizable constants from the scope proxy, which
+  // will be bound to `this`.
   return `const {${arrayJoin(constants, ',')}} = this;`;
 }

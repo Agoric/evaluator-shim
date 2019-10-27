@@ -2,7 +2,7 @@
 // https://github.com/v8/v8/blob/master/src/builtins/builtins-function.cc
 
 import { apply, arrayConcat, proxyRevocable } from './commons';
-import { buildOptimizer, getOptimizableGlobals } from './optimizer';
+import { buildOptimizer, getOptimizableConstants } from './optimizer';
 import { createScopeHandler, immutableObject } from './scopeHandler';
 import { applyTransforms, mandatoryTransforms } from './transforms';
 import { throwTantrum } from './utilities';
@@ -73,13 +73,15 @@ export function createSafeEvaluatorFactory(
     function safeEvaluator(src) {
       let rewriterState = { src, endowments };
       rewriterState = applyTransforms(rewriterState, transforms);
+      const finalEndowments = rewriterState.endowments;
 
-      // Combine all optimizable globals.
-      const globalConstants = getOptimizableGlobals(
+      // Combine all properties that can be optimized into `const`
+      // declared variables.
+      const globalConstants = getOptimizableConstants(
         safeGlobal,
-        rewriterState.endowments
+        finalEndowments
       );
-      const localConstants = getOptimizableGlobals(rewriterState.endowments);
+      const localConstants = getOptimizableConstants(finalEndowments);
       const constants = arrayConcat(globalConstants, localConstants);
 
       const scopedEvaluatorFactory = createScopedEvaluatorFactory(
@@ -90,12 +92,12 @@ export function createSafeEvaluatorFactory(
       const scopeHandler = createScopeHandler(
         unsafeRec,
         safeGlobal,
-        rewriterState.endowments,
+        finalEndowments,
         sloppyGlobalsMode
       );
       const scopeProxyRevocable = proxyRevocable(immutableObject, scopeHandler);
       const scopeProxy = scopeProxyRevocable.proxy;
-      
+
       const scopedEvaluator = apply(scopedEvaluatorFactory, scopeProxy, [
         scopeProxy
       ]);
