@@ -29,19 +29,17 @@ test('HostException in eval revokes unsafeEval', t => {
         loop();
       } catch(e) {}
 
-      __capture__.evalToString = eval.toString();
+      __capture__.eval = eval;
     `,
       endowments,
     );
     // eslint-disable-next-line no-empty
   } catch (err) {}
 
-  const {
-    __capture__: { evalToString },
-  } = endowments;
-
-  t.notOk(evalToString.includes('native code'), 'should not be unsafe eval');
-  t.ok(evalToString.includes('shim code'), "should be realm's eval");
+  // eslint-disable-next-line no-eval, no-underscore-dangle
+  t.notEqual(endowments.__capture__.eval, eval, 'should not be unsafe eval');
+  // eslint-disable-next-line no-underscore-dangle
+  t.equal(endowments.__capture__.eval, e.global.eval, "should be realm's eval");
 
   sinon.restore();
 });
@@ -73,19 +71,17 @@ test('HostException in Function revokes unsafeEval', t => {
         loop();
       } catch(e) {}
 
-      __capture__.evalToString = eval.toString();
+      __capture__.eval = eval;
     `,
       endowments,
     );
     // eslint-disable-next-line no-empty
   } catch (err) {}
 
-  const {
-    __capture__: { evalToString },
-  } = endowments;
-
-  t.notOk(evalToString.includes('native code'), 'should not be unsafe eval');
-  t.ok(evalToString.includes('shim code'), "should be realm's eval");
+  // eslint-disable-next-line no-eval, no-underscore-dangle
+  t.notEqual(endowments.__capture__.eval, eval, 'should not be unsafe eval');
+  // eslint-disable-next-line no-underscore-dangle
+  t.equal(endowments.__capture__.eval, e.global.eval, "should be realm's eval");
 
   sinon.restore();
 });
